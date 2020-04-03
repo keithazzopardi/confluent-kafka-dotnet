@@ -18,10 +18,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Avro.Specific;
 using Confluent.Kafka.SyncOverAsync;
 using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
-
+using Newtonsoft.Json;
 
 namespace Confluent.Kafka.Examples.AvroSpecific
 {
@@ -29,31 +30,41 @@ namespace Confluent.Kafka.Examples.AvroSpecific
     {
         static async Task Main(string[] args)
         {
-            if (args.Length != 3)
-            {
-                Console.WriteLine("Usage: .. bootstrapServers schemaRegistryUrl topicName");
-                return;
-            }
+            //if (args.Length != 3)
+            //{
+            //    Console.WriteLine("Usage: .. bootstrapServers schemaRegistryUrl topicName");
+            //    return;
+            //}
 
-            string bootstrapServers = args[0];
-            string schemaRegistryUrl = args[1];
-            string topicName = args[2];
+            var url = "<url>";
+            string bootstrapServers = $"{url}:9092";
+            string schemaRegistryUrl = $"{url}:8081";
+            string topicName = "test-multiple-schema";
 
             var producerConfig = new ProducerConfig
             {
                 BootstrapServers = bootstrapServers
             };
 
-            var schemaRegistryConfig = new SchemaRegistryConfig
+            //var schemaRegistryConfig = new SchemaRegistryConfig
+            //{
+            //    // Note: you can specify more than one schema registry url using the
+            //    // schema.registry.url property for redundancy (comma separated list). 
+            //    // The property name is not plural to follow the convention set by
+            //    // the Java implementation.
+            //    Url = schemaRegistryUrl,
+            //    // optional schema registry client properties:
+            //    RequestTimeoutMs = 5000,
+            //    MaxCachedSchemas = 10,
+            //    ValueSubjectNameStrategy = SubjectNameStrategy.TopicRecord
+            //};
+
+            var schemaRegistryConfig = new Dictionary<string, string>
             {
-                // Note: you can specify more than one schema registry url using the
-                // schema.registry.url property for redundancy (comma separated list). 
-                // The property name is not plural to follow the convention set by
-                // the Java implementation.
-                Url = schemaRegistryUrl,
-                // optional schema registry client properties:
-                RequestTimeoutMs = 5000,
-                MaxCachedSchemas = 10
+                { "schema.registry.url", schemaRegistryUrl },
+                { "schema.registry.request.timeout.ms", "5000" },
+                { "schema.registry.max.cached.schemas", "10" },
+                {"schema.registry.value.subject.name.strategy", "TopicRecord" }
             };
 
             var consumerConfig = new ConsumerConfig
@@ -80,9 +91,9 @@ namespace Confluent.Kafka.Examples.AvroSpecific
             {
                 using (var schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryConfig))
                 using (var consumer =
-                    new ConsumerBuilder<string, User>(consumerConfig)
+                    new ConsumerBuilder<string, ISpecificRecord>(consumerConfig)
                         .SetKeyDeserializer(new AvroDeserializer<string>(schemaRegistry).AsSyncOverAsync())
-                        .SetValueDeserializer(new AvroDeserializer<User>(schemaRegistry).AsSyncOverAsync())
+                        .SetValueDeserializer(new GenericAvroDeserializer<ISpecificRecord>(schemaRegistry).AsSyncOverAsync())
                         .SetErrorHandler((_, e) => Console.WriteLine($"Error: {e.Reason}"))
                         .Build())
                 {
@@ -96,7 +107,9 @@ namespace Confluent.Kafka.Examples.AvroSpecific
                             {
                                 var consumeResult = consumer.Consume(cts.Token);
 
-                                Console.WriteLine($"user name: {consumeResult.Message.Key}, favorite color: {consumeResult.Value.favorite_color}");
+                                if (consumeResult.Value is Player player) Console.WriteLine($"player name: {player.playername}, city: {player.city}");
+                                else if (consumeResult.Value is User user) Console.WriteLine($"user name: {user.name}, favourite colour: {user.favorite_color}");
+                                else Console.WriteLine($"Other value {JsonConvert.SerializeObject(consumeResult.Value.Schema)}");
                             }
                             catch (ConsumeException e)
                             {
@@ -113,9 +126,9 @@ namespace Confluent.Kafka.Examples.AvroSpecific
 
             using (var schemaRegistry = new CachedSchemaRegistryClient(schemaRegistryConfig))
             using (var producer =
-                new ProducerBuilder<string, User>(producerConfig)
+                new ProducerBuilder<string, ISpecificRecord>(producerConfig)
                     .SetKeySerializer(new AvroSerializer<string>(schemaRegistry))
-                    .SetValueSerializer(new AvroSerializer<User>(schemaRegistry))
+                    .SetValueSerializer(new GenericAvroSerializer<ISpecificRecord>(schemaRegistry))
                     .Build())
             {
                 Console.WriteLine($"{producer.Name} producing on {topicName}. Enter user names, q to exit.");
@@ -124,12 +137,18 @@ namespace Confluent.Kafka.Examples.AvroSpecific
                 string text;
                 while ((text = Console.ReadLine()) != "q")
                 {
-                    User user = new User { name = text, favorite_color = "green", favorite_number = i++ };
-                    await producer
-                        .ProduceAsync(topicName, new Message<string, User> { Key = text, Value = user})
-                        .ContinueWith(task => task.IsFaulted
-                            ? $"error producing message: {task.Exception.Message}"
-                            : $"produced to: {task.Result.TopicPartitionOffset}");
+                    if (text.StartsWith('p'))
+                    {
+                        var player = new Player { playerid = i++, playername = "some player", city = "malta" };
+                        var statusPlayer = await producer.ProduceAsync(topicName, new Message<string, ISpecificRecord> { Key = text, Value = player });
+                        Console.WriteLine($"Commit status: {statusPlayer.Status}");
+                    }
+                    else
+                    {
+                        var user = new User { name = "some user", favorite_color = "green", favorite_number = i++ };
+                        var statusUser = await producer.ProduceAsync(topicName, new Message<string, ISpecificRecord> { Key = text, Value = user });
+                        Console.WriteLine($"Commit status: {statusUser.Status}");
+                    }
                 }
             }
 

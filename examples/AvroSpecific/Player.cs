@@ -13,61 +13,61 @@ namespace Confluent.Kafka.Examples.AvroSpecific
     using global::Avro;
     using global::Avro.Specific;
 
-    public partial class User : ISpecificRecord
+    public partial class Player : ISpecificRecord
     {
-        public static Schema _SCHEMA = Schema.Parse("{\"type\":\"record\",\"name\":\"User\",\"namespace\":\"Confluent.Kafka.Examples.AvroSpecific" +
-                "\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"favorite_number\",\"type\":[\"i" +
-                "nt\",\"null\"]},{\"name\":\"favorite_color\",\"type\":[\"string\",\"null\"]}]}");
-        private string _name;
-        private System.Nullable<int> _favorite_number;
-        private string _favorite_color;
+        public static Schema _SCHEMA = Schema.Parse("{\"type\":\"record\",\"name\":\"Player\",\"namespace\":\"Confluent.Kafka.Examples.AvroSpecific" +
+                "\",\"fields\":[{\"name\":\"playername\",\"type\":\"string\"},{\"name\":\"playerid\",\"type\":[\"i" +
+                "nt\",\"null\"]},{\"name\":\"city\",\"type\":[\"string\",\"null\"]}]}");
+        private string _playername;
+        private System.Nullable<int> _playerid;
+        private string _city;
         public Schema Schema
         {
             get
             {
-                return User._SCHEMA;
+                return Player._SCHEMA;
             }
         }
-        public string name
+        public string playername
         {
             get
             {
-                return this._name;
+                return this._playername;
             }
             set
             {
-                this._name = value;
+                this._playername = value;
             }
         }
-        public System.Nullable<int> favorite_number
+        public System.Nullable<int> playerid
         {
             get
             {
-                return this._favorite_number;
+                return this._playerid;
             }
             set
             {
-                this._favorite_number = value;
+                this._playerid = value;
             }
         }
-        public string favorite_color
+        public string city
         {
             get
             {
-                return this._favorite_color;
+                return this._city;
             }
             set
             {
-                this._favorite_color = value;
+                this._city = value;
             }
         }
         public object Get(int fieldPos)
         {
             switch (fieldPos)
             {
-                case 0: return this.name;
-                case 1: return this.favorite_number;
-                case 2: return this.favorite_color;
+                case 0: return this.playername;
+                case 1: return this.playerid;
+                case 2: return this.city;
                 default: throw new AvroRuntimeException("Bad index " + fieldPos + " in Get()");
             };
         }
@@ -75,9 +75,9 @@ namespace Confluent.Kafka.Examples.AvroSpecific
         {
             switch (fieldPos)
             {
-                case 0: this.name = (System.String)fieldValue; break;
-                case 1: this.favorite_number = (System.Nullable<int>)fieldValue; break;
-                case 2: this.favorite_color = (System.String)fieldValue; break;
+                case 0: this.playername = (System.String)fieldValue; break;
+                case 1: this.playerid = (System.Nullable<int>)fieldValue; break;
+                case 2: this.city = (System.String)fieldValue; break;
                 default: throw new AvroRuntimeException("Bad index " + fieldPos + " in Put()");
             };
         }
